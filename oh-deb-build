@@ -39,10 +39,7 @@ def validate():
 def get_build_number():
     ''' returns build number supplied on command line '''
     try:
-        return int(sys.argv[1])
-    except ValueError, e:
-        print("argument (build number) has to be integer");
-        sys.exit(1)
+        return sys.argv[1]
     except IndexError, e:
         help()
         sys.exit(1)
@@ -84,7 +81,7 @@ def copy_replace_control(build_number, control_template, control):
     with open(control_template, "r") as inp, open(control, "w") as out:
         for line in inp:
             if pattern in line:
-                line = line.replace(pattern, str(build_number))
+                line = line.replace(pattern, build_number)
             out.write(line)
 
 def get_filenames(directory):
@@ -94,12 +91,11 @@ def get_filenames(directory):
 if __name__ == '__main__':
 
     validate()
-    build_number = get_build_number()
 
     # create control file from template and replace supplied build number
     control_template = os.path.join(in_dir, "control")
     control = os.path.join(out_dir, "control")
-    copy_replace_control(build_number, control_template, control)
+    copy_replace_control(get_build_number(), control_template, control)
 
     control_fields = get_control_fields(control)
     # get only files (templates) from DEB_DIR
