@@ -1,0 +1,113 @@
+#!/usr/bin/python
+
+import sys
+import os
+import os.path
+import shutil
+
+# directory to be packaged
+TOPDIR="debian"
+# directory with control and other deb file
+DEB_DIR="DEBIAN"
+# current working directory
+path="."
+# input (templates) and output
+in_dir = os.path.join(path, DEB_DIR)
+out_dir = os.path.join(path, TOPDIR, DEB_DIR)
+
+topdir = os.path.join(path, TOPDIR)
+
+
+def help():
+    print("")
+    print("Command takes control (and other files) from DEBIAN directory")
+    print("and packages up everything that is in debian directory.")
+    print("Command has to be run in the directory that contains these.")
+    print("Usage:")
+    print("oh-deb-build <build_number>")
+
+def validate():
+    if not os.path.exists(topdir) and not os.path.isdir(topdir):
+        print("Directory {} cannot be found. Nothing to package.".format(topdir))
+    if not os.path.exists(in_dir) and not os.path.isdir(in_dir):
+        print("Directory {} cannot be found. Cannot create debian files.".format(in_dir))
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+    os.mkdir(out_dir)
+
+def get_control_meta(control, keys):
+    ''' first argument is control file and second is dict with key - placeholder
+        and value - value to be searched. Ex: {'${VERSION}': 'Version:'}  will
+        find line that starts with 'Version:' and returns {'${VERSION}': '0.1'} '''
+    keys_size = len(keys)
+    values = [] # makes sure that only first search is saved
+    meta = {}   # values to be returned
+    with open(control, "r") as inp:
+        for line in inp:
+            for placeholder in keys:
+                search = keys[placeholder]
+                if line.startswith(search) and search not in values:
+                    value = line[len(search):].strip().lstrip(':').lstrip()
+                    values.append(value)
+                    meta[placeholder] = value
+                    if len(values) == keys_size:
+                        break
+    return meta
+
+def copy_replace(replace, src_path, dst_path):
+    ''' copies src_path to dst_path and runs replace method on every line '''
+    with open(src_path, "r") as inp, open(dst_path, "w") as out:
+        for line in inp:
+            out.write(replace(line))
+
+def copy_replace_control(build_number, control_template, control):
+    ''' replace build number in control file '''
+    copy_replace(lambda line: line.replace('${BUILD_NUMBER}', str(build_number)), control_template, control)
+
+def replace(line):
+    ''' used in copy_replace method, replaces placeholders for meta data  '''
+    meta = get_control_meta(control, {'${PACKAGE}': 'Package', '${VERSION}': 'Version', '${ARCHITECTURE}': 'Architecture'})
+    for k in meta:
+        v = meta[k]
+        line = line.replace(k, v)
+    return line
+
+if __name__ == '__main__':
+
+    validate()
+
+    # get build number
+    try:
+        build_number = int(sys.argv[1])
+    except ValueError, e:
+        print("argument (build number) has to be integer");
+        sys.exit(1)
+    except IndexError, e:
+        help()
+        sys.exit(1)
+
+    # create control file from template and replace supplied build number
+    control_template = os.path.join(in_dir, "control")
+    control = os.path.join(out_dir, "control")
+    copy_replace_control(build_number, control_template, control)
+
+    # get only files (templates) from DEB_DIR
+    filenames = [ f for f in os.listdir(in_dir) if os.path.isfile(os.path.join(in_dir, f)) ]
+    try:
+        for filename in filenames:
+            in_path = os.path.join(in_dir, filename)
+            out_path = os.path.join(out_dir, filename)
+            if filename != 'control':   # control has already been done
+                copy_replace(replace, in_path, out_path)
+    except IOError, e:
+        print(str(e))
+        sys.exit(1)
+
+    # build package
+    meta = get_control_meta(control, {'${PACKAGE}': 'Package', '${VERSION}': 'Version', '${ARCHITECTURE}': 'Architecture'})
+    package_name = "{}_{}_{}.deb".format(meta['${PACKAGE}'], meta['${VERSION}'], meta['${ARCHITECTURE}'])
+
+    os.system("find {} -type f | xargs chmod 755".format(out_dir))
+    os.system("fakeroot dpkg-deb --build ./debian > /dev/null")
+    os.rename("debian.deb", package_name)
+
