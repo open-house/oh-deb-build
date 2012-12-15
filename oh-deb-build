@@ -17,7 +17,6 @@ out_dir = os.path.join(path, TOPDIR, DEB_DIR)
 
 topdir = os.path.join(path, TOPDIR)
 
-
 def help():
     print("")
     print("Command takes control (and other files) from DEBIAN directory")
@@ -37,30 +36,47 @@ def validate():
         shutil.rmtree(out_dir)
     os.mkdir(out_dir)
 
-def get_control_meta(control, keys):
-    ''' first argument is control file and second is dict with key - placeholder
-        and value - value to be searched. Ex: {'${VERSION}': 'Version:'}  will
-        find line that starts with 'Version:' and returns {'${VERSION}': '0.1'} '''
-    keys_size = len(keys)
-    values = [] # makes sure that only first search is saved
-    meta = {}   # values to be returned
+def get_build_number():
+    ''' returns build number supplied on command line '''
+    try:
+        return int(sys.argv[1])
+    except ValueError, e:
+        print("argument (build number) has to be integer");
+        sys.exit(1)
+    except IndexError, e:
+        help()
+        sys.exit(1)
+
+def get_control_fields(control):
+    ''' Searches control file and matches lines that do NOT start with as
+        white space and contain semicolon. First part (before semicolon)
+        is a key and second part (after semicolon) is a value. This is then
+        returned as dict '''
+    meta = {}
     with open(control, "r") as inp:
+        last_key = None
         for line in inp:
-            for placeholder in keys:
-                search = keys[placeholder]
-                if line.startswith(search) and search not in values:
-                    value = line[len(search):].strip().lstrip(':').lstrip()
-                    values.append(value)
-                    meta[placeholder] = value
-                    if len(values) == keys_size:
-                        break
+            # line does not start with white space and contains colon
+            if line == line.lstrip() and ":" in line:
+                x = line.split(":", 1)
+                last_key = x[0].strip()
+                meta[last_key] = x[1].strip()
+            # line starts with whitespace, still value of the previous key
+            if line != line.lstrip():
+                meta[last_key] = " ".join([meta[last_key], line.strip()])
     return meta
 
-def copy_replace(replace, src_path, dst_path):
-    ''' copies src_path to dst_path and runs replace method on every line '''
+def copy_replace(control_fields, src_path, dst_path):
+    ''' converts key from supplied control_fields to upper case and places it
+        inside ${}, Version becomes ${VERSION}. This is then searched in the
+        file and replaced for value. '''
+    fields = {"${{{}}}".format(k.upper()): control_fields[k] for k in control_fields}
     with open(src_path, "r") as inp, open(dst_path, "w") as out:
         for line in inp:
-            out.write(replace(line))
+            for pattern in fields:
+                if pattern in line:
+                    line = line.replace(pattern, fields[pattern])
+            out.write(line)
 
 def copy_replace_control(build_number, control_template, control):
     ''' copies template and replace build number '''
@@ -69,53 +85,42 @@ def copy_replace_control(build_number, control_template, control):
         for line in inp:
             if pattern in line:
                 line = line.replace(pattern, str(build_number))
-            out.write(replace(line))
+            out.write(line)
 
-def replace(line):
-    ''' used in copy_replace method, replaces placeholders for meta data  '''
-    meta = get_control_meta(control, {'${PACKAGE}': 'Package', '${VERSION}': 'Version', '${ARCHITECTURE}': 'Architecture'})
-    for k in meta:
-        v = meta[k]
-        line = line.replace(k, v)
-    return line
+def get_filenames(directory):
+    ''' returns only filenames (first level) of the supplied directory '''
+    return [ f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f)) ]
 
 if __name__ == '__main__':
 
     validate()
-
-    # get build number
-    try:
-        build_number = int(sys.argv[1])
-    except ValueError, e:
-        print("argument (build number) has to be integer");
-        sys.exit(1)
-    except IndexError, e:
-        help()
-        sys.exit(1)
+    build_number = get_build_number()
 
     # create control file from template and replace supplied build number
     control_template = os.path.join(in_dir, "control")
     control = os.path.join(out_dir, "control")
     copy_replace_control(build_number, control_template, control)
 
-    sys.exit(0)
+    control_fields = get_control_fields(control)
     # get only files (templates) from DEB_DIR
-    filenames = [ f for f in os.listdir(in_dir) if os.path.isfile(os.path.join(in_dir, f)) ]
+    filenames = get_filenames(in_dir)
     try:
         for filename in filenames:
             in_path = os.path.join(in_dir, filename)
             out_path = os.path.join(out_dir, filename)
             if filename != 'control':   # control has already been done
-                copy_replace(replace, in_path, out_path)
+                copy_replace(control_fields, in_path, out_path)
     except IOError, e:
         print(str(e))
         sys.exit(1)
 
-    # build package
-    meta = get_control_meta(control, {'${PACKAGE}': 'Package', '${VERSION}': 'Version', '${ARCHITECTURE}': 'Architecture'})
-    package_name = "{}_{}_{}.deb".format(meta['${PACKAGE}'], meta['${VERSION}'], meta['${ARCHITECTURE}'])
+    # final package name
+    package = control_fields['Package']
+    version = control_fields['Version']
+    architecture = control_fields['Architecture']
+    package_name = "{}_{}_{}.deb".format(package, version, architecture)
 
+    # build package
     os.system("find {} -type f | xargs chmod 755".format(out_dir))
     os.system("fakeroot dpkg-deb --build ./debian > /dev/null")
     os.rename("debian.deb", package_name)
-
