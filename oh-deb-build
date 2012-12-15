@@ -29,8 +29,10 @@ def help():
 def validate():
     if not os.path.exists(topdir) and not os.path.isdir(topdir):
         print("Directory {} cannot be found. Nothing to package.".format(topdir))
+        sys.exit(1)
     if not os.path.exists(in_dir) and not os.path.isdir(in_dir):
         print("Directory {} cannot be found. Cannot create debian files.".format(in_dir))
+        sys.exit(1)
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
     os.mkdir(out_dir)
@@ -61,8 +63,13 @@ def copy_replace(replace, src_path, dst_path):
             out.write(replace(line))
 
 def copy_replace_control(build_number, control_template, control):
-    ''' replace build number in control file '''
-    copy_replace(lambda line: line.replace('${BUILD_NUMBER}', str(build_number)), control_template, control)
+    ''' copies template and replace build number '''
+    pattern = "${BUILD_NUMBER}"
+    with open(control_template, "r") as inp, open(control, "w") as out:
+        for line in inp:
+            if pattern in line:
+                line = line.replace(pattern, str(build_number))
+            out.write(replace(line))
 
 def replace(line):
     ''' used in copy_replace method, replaces placeholders for meta data  '''
@@ -91,6 +98,7 @@ if __name__ == '__main__':
     control = os.path.join(out_dir, "control")
     copy_replace_control(build_number, control_template, control)
 
+    sys.exit(0)
     # get only files (templates) from DEB_DIR
     filenames = [ f for f in os.listdir(in_dir) if os.path.isfile(os.path.join(in_dir, f)) ]
     try:
