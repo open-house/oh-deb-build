@@ -23,7 +23,7 @@ def help():
     print("and packages up everything that is in debian directory.")
     print("Command has to be run in the directory that contains these.")
     print("Usage:")
-    print("oh-deb-build <build_number>")
+    print("oh-deb-build <version>")
 
 def validate():
     if not os.path.exists(topdir) and not os.path.isdir(topdir):
@@ -36,8 +36,8 @@ def validate():
         shutil.rmtree(out_dir)
     os.mkdir(out_dir)
 
-def get_build_number():
-    ''' returns build number supplied on command line '''
+def get_version():
+    ''' returns version supplied on command line '''
     try:
         return sys.argv[1]
     except IndexError, e:
@@ -75,13 +75,13 @@ def copy_replace(control_fields, src_path, dst_path):
                     line = line.replace(pattern, fields[pattern])
             out.write(line)
 
-def copy_replace_control(build_number, control_template, control):
-    ''' copies template and replace build number '''
-    pattern = "${BUILD_NUMBER}"
+def copy_replace_control(version, control_template, control):
+    ''' copies template and replace version '''
+    pattern = "${VERSION}"
     with open(control_template, "r") as inp, open(control, "w") as out:
         for line in inp:
             if pattern in line:
-                line = line.replace(pattern, build_number)
+                line = line.replace(pattern, version)
             out.write(line)
 
 def get_filenames(directory):
@@ -92,10 +92,10 @@ if __name__ == '__main__':
 
     validate()
 
-    # create control file from template and replace supplied build number
+    # create control file from template and replace supplied version
     control_template = os.path.join(in_dir, "control")
     control = os.path.join(out_dir, "control")
-    copy_replace_control(get_build_number(), control_template, control)
+    copy_replace_control(get_version(), control_template, control)
 
     control_fields = get_control_fields(control)
     # get only files (templates) from DEB_DIR
