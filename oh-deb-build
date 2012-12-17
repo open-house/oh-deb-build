@@ -118,5 +118,4 @@ if __name__ == '__main__':
 
     # build package
     os.system("find {} -type f | xargs chmod 755".format(out_dir))
-    os.system("fakeroot dpkg-deb --build ./debian > /dev/null")
-    os.rename("debian.deb", package_name)
+    os.system("fakeroot dpkg-deb --build ./debian {} > /dev/null".format(package_name))
