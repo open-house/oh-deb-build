@@ -36,6 +36,12 @@ install
 sudo install oh-deb-build /usr/local/bin/
 </code></pre>
 
+or to generate deb package
+
+<pre><code>
+./build <build_number>
+</code></pre>
+
 dependencies
 ------------
 - uses <code>dpkg-deb --build</code> command to build package
