@@ -1,0 +1,9 @@
+Package: oh-deb-build
+Version: ${VERSION}
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: pete reisinger <p.reisinger@gmail.com>
+Description: deb package builder
+ Helper utility to build packages when the build number/version is automatically
+ generated. This utility allows to pass it as an argument.

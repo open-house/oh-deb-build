@@ -1,0 +1,46 @@
+#!/bin/sh -e
+
+if [ $# -lt 1 ]
+then
+    echo "supply build number as the first argument"
+    exit 1
+fi
+
+VERSION="0.1-$1"
+TOPDIR=debian
+DEB_DIR=DEBIAN
+
+if [ ! -f ./$DEB_DIR/control ]
+then
+    echo "control file $DEB_DIR/control not found"
+    exit 1
+fi
+
+# copy DEBIAN/* files to debian/DEBIAN/ and replace ${VERSION} if any
+mkdir -p ./$TOPDIR/$DEB_DIR
+for f in ./$DEB_DIR/*
+do
+    sed -e "s/\${VERSION}/$VERSION/g" ./$f > ./$TOPDIR/$f
+done
+
+# get Package, Version and Architecture from control file
+PACKAGE=$(awk /^Package:/'{print $2}' ./$TOPDIR/$DEB_DIR/control)
+VERSION=$(awk /^Version:/'{print $2}' ./$TOPDIR/$DEB_DIR/control)
+ARCHITECTURE=$(awk /^Architecture:/'{print $2}' ./$TOPDIR/$DEB_DIR/control)
+
+# set dir mode
+find ./$TOPDIR -type d | xargs chmod 755
+
+# copy script to /usr/local/bin
+INSTALL_DIR=./$TOPDIR/usr/local/bin
+mkdir -p $INSTALL_DIR
+cp ./oh-deb-build $INSTALL_DIR
+
+# remove existing deb packages
+rm -f ./*.deb
+
+# build package
+fakeroot dpkg-deb --build ./debian ${PACKAGE}_${VERSION}_${ARCHITECTURE}.deb > /dev/null
+
+# clean up build root (topdir)
+rm -rf ./$TOPDIR
