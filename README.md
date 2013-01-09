@@ -1,6 +1,5 @@
 oh-deb-build
 ============
-[![Build Status](https://travis-ci.org/pete911/oh-deb-build.png)](https://travis-ci.org/pete911/oh-deb-build)
 
 description
 ----------
