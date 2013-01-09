@@ -45,4 +45,3 @@ or to generate deb package
 dependencies
 ------------
 - uses <code>dpkg-deb --build</code> command to build package
-
