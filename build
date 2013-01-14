@@ -36,6 +36,8 @@ INSTALL_DIR=./$TOPDIR/usr/local/bin
 mkdir -p $INSTALL_DIR
 cp ./oh-deb-build $INSTALL_DIR
 
+chmod 755 $INSTALL_DIR/oh-deb-build
+
 # remove existing deb packages
 rm -f ./*.deb
 
